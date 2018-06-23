@@ -2,6 +2,7 @@
 
 
 var CryptoJs = require('crypto-js')
+var SHA256 = require("crypto-js/sha256");
 var express = require('express')
 var bodyparser = require('body-parser')
 var WebSocket = require('ws')
@@ -52,13 +53,16 @@ var initHTTPServer = () => {
     var app = express();
     app.use(bodyparser.json());
     app.get('/blocks', (req, res) => res.send(JSON.stringify(blockchain)));
+   
+   
     app.post('/mineBlock', (req, res) => {
 
+        //console.log(req.body.data);
         var newBlock = generateNextBlock(req.body.data);
         addBlock(newBlock);
-        brodcast(responseLatastMsg());
+        brodcast(responseLatestMsg());
         console.log('block added:' + JSON.stringify(newBlock));
-        res.send();
+        res.send();a899f34b5ce4ba748db58d5792a2ee26a9bcc06483d446a61f8454271c168437
     });
 
     app.get('/peers', (req, res) => {
@@ -91,12 +95,11 @@ var initP2PServer = () => {
     console.log('listening websocket on :' + p2p_port);
 }
 
-
+var ws= new WebSocket()
 var initConnection = (ws) => {
 
-    soockets.push(ws);
-
-    initMessageHandler(ws);
+    socket.push(ws);
+    initMessageHandler(ws)
     initErrorHandler(ws);
     Write(ws.queryChainLengthMsg());
 };
@@ -105,7 +108,8 @@ var initConnection = (ws) => {
 
 var generateNextBlock = (blockData) => {
 
-    var previousBlock = getLatestBlock();
+    var previousBlock = JSON.parse(getLatestBlock());
+    console.log(previousBlock);
     var nextIndex = previousBlock.index + 1;
     var nextTimeStamp = new Date().getTime() / 1000;
     var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimeStamp, blockData);
@@ -120,7 +124,7 @@ var generateNextBlock = (blockData) => {
 
 var calculateHash = (index, previousHash, timestamp, data) => {
 
-    return CryptoJS.SHA256(index + previousHash + timestamp + data).toString();
+    return SHA256(index + previousHash + timestamp + data).toString();
 
 }
 
@@ -128,19 +132,26 @@ var calculateHash = (index, previousHash, timestamp, data) => {
 
 var calculateHashForBlock = (block) => {
 
-    return calculateHash(block.index, block.previousBlock, block.timestamp, block.data);
+    return calculateHash(block.index, block.previousHash, block.timestamp, block.data);
 }
 
 //add a block into blockchain
 var addBlock = (newBlock) => {
 
-    if (isValidNewBlock(newBlock, getLatestBlock())) {
+    console.log(newBlock)
+    var latest=JSON.parse(getLatestBlock());
+    console.log("latest"+latest);
+
+    if (isValidNewBlock(newBlock, latest)) {
 
         blockchain.push(newBlock);
     }
 }
 
 var isValidNewBlock = (newBlock, previousBlock) => {
+    console.log(newBlock.index)
+    console.log(previousBlock.index)
+    
     if (previousBlock.index + 1 != newBlock.index) {
         console.log("invalid index");
         return false;
@@ -151,7 +162,7 @@ var isValidNewBlock = (newBlock, previousBlock) => {
     }
     else if (calculateHashForBlock(newBlock) != newBlock.hash) {
         console.log(typeof calculateHashForBlock(newBlock))
-        console.log("invalid hash :" + calculateHashForBlock(newBlock) + newBlock.hash);
+        console.log("invalid hash :" + calculateHashForBlock(newBlock) +"=="+ newBlock.hash);
         return false
     }
     return true;
@@ -165,36 +176,38 @@ var isValidNewBlock = (newBlock, previousBlock) => {
 var getLatestBlock = () => {
 
     blockchain[blockchain.length - 1];
-
-    var queryChainLengthMsg = () => ({
-        'type': messageType.QUEry_LATEST
-    })
-
-    var queryAllMsg = () => ({
-        'type': messageType.QUERY_ALL
-
-
-    });
-
-    var responseChainMsg = () => ({
-
-        'type': messageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(blockchain)
-
-    });
-
-    var responseLatestMsg = () => ({
-
-        'type': messageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(getLatestBlock())
-
-    });
-
-
+    return JSON.stringify(blockchain[blockchain.length - 1])
 }
+
+var queryChainLengthMsg = () => ({
+    'type': messageType.QUERY_LATEST
+})
+
+var queryAllMsg = () => ({
+    'type': messageType.QUERY_ALL
+
+
+});
+
+var responseChainMsg = () => ({
+
+    'type': messageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(blockchain)
+
+});
+
+var responseLatestMsg = () => ({
+
+    'type': messageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(getLatestBlock())
+
+});
+
+
+
 
 
 var connectToPeers = (newPeers) => {
 
-    newPeers.forEach( function(peer) {
+    newPeers.forEach(function (peer) {
 
         var ws = new WebSocket(peer)
         ws.on('open', () => initConnection(ws));
